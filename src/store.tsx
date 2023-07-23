@@ -1,4 +1,11 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useReducer,
+} from "react";
 
 interface Pokemon {
   id: number;
@@ -12,20 +19,54 @@ interface Pokemon {
   speed: number;
 }
 
-function usePokemonSource(): {
+type PokemonState = {
   pokemon: Pokemon[];
-} {
-  const [pokemon, setPokemon] = useState<Pokemon[]>([]);
+  search: string;
+};
+
+type PokemonAction =
+  | { type: "setPokemon"; payload: Pokemon[] }
+  | { type: "setSearch"; payload: string };
+
+function usePokemonSource() {
+  // const [pokemon, setPokemon] = useState<Pokemon[]>([]);
+  // const [search, setSearch] = useState("");
+
+  const [{ pokemon, search }, dispatch] = useReducer(
+    (state: PokemonState, action: PokemonAction) => {
+      switch (action.type) {
+        case "setPokemon":
+          return { ...state, pokemon: action.payload };
+
+        case "setSearch":
+          return { ...state, search: action.payload };
+      }
+    },
+    {
+      pokemon: [],
+      search: "",
+    }
+  );
+
+  const setSearch = useCallback((search: string) => {
+    dispatch({ type: "setSearch", payload: search });
+  }, []);
+
+  const filteredPokemon = useMemo(() => {
+    return pokemon
+      .filter((p) => p.name.toLowerCase().includes(search.toLocaleLowerCase()))
+      .slice(0, 20);
+  }, [pokemon, search]);
 
   useEffect(() => {
     fetch("/pokemon.json")
       .then((response) => response.json())
-      .then((data: Pokemon[]) => setPokemon(data));
+      .then((data: Pokemon[]) =>
+        dispatch({ type: "setPokemon", payload: data })
+      );
   }, []);
 
-  return {
-    pokemon,
-  };
+  return { pokemon: filteredPokemon, search, setSearch };
 }
 
 const PokemonContext = createContext({} as ReturnType<typeof usePokemonSource>);
@@ -42,4 +83,3 @@ export function PokemonProvider({ children }: { children: React.ReactNode }) {
     </>
   );
 }
-
